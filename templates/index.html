@@ -159,7 +159,7 @@
     let plcRequesting = false;
     const MAX_CAPTURE_WIDTH = 1920;  // 提高截帧分辨率上限，兼顾清晰度
     const JPEG_QUALITY = 0.9;        // 提高 JPEG 质量，减少压缩模糊
-    const PLC_CAPTURE_DELAY_MS = 10; // PLC 触发后延迟截帧，避免画面未稳定
+    const PLC_CAPTURE_DELAY_MS = 10; // PLC 触发后固定延迟 10ms 再截帧，确保画面稳定
 
     function initCounts() {
       countGrid.innerHTML = '';

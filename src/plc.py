@@ -9,7 +9,7 @@ try:
 except Exception:  # pragma: no cover
     snap7 = None
 
-RETRY_DELAY_SEC = 0.05
+RETRY_DELAY_SEC = 0.02
 FAST_TRIGGER_WINDOW_SEC = 0.1
 
 
@@ -27,6 +27,7 @@ class PLCManager:
         self.exec_count = 0
         self.last_trigger: Optional[int] = None
         self.last_trigger_ts = 0.0
+        self.last_result: Optional[int] = None
 
     def connect(self) -> bool:
         if snap7 is None:
@@ -94,8 +95,8 @@ class PLCManager:
         self.connected = False
         return False
 
-    def write_result(self, cls_id: int, max_retries: int = 3):
-        """Single PLC round trip: DBW0=2 (done), DBW2=cls_id."""
+    def write_result(self, cls_id: int, max_retries: int = 3) -> bool:
+        """Single PLC round trip: DBW0=2 (done), DBW2=cls_id（毫秒级写回，无额外确认读）。"""
         status_val = max(-32768, min(32767, 2))
         cls_val = max(-32768, min(32767, int(cls_id)))
         payload = status_val.to_bytes(2, byteorder="big", signed=True) + cls_val.to_bytes(
@@ -109,6 +110,7 @@ class PLCManager:
                     # write DBW0 and DBW2 together to cut latency
                     self.client.db_write(self.db, 0, payload)
                     self.exec_count += 1
+                    self.last_result = cls_val
                     return True
                 except Exception as exc:
                     self.last_error = f"write_result failed: {exc}"
@@ -130,5 +132,6 @@ class PLCManager:
             "db": self.db,
             "last_error": self.last_error,
             "exec_count": self.exec_count,
+            "last_result": self.last_result,
             "trigger": trigger,
         }
