@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能人参分拣终端 | 启动</title>
+  <style>
+    :root {
+      --bg: #080d1f;
+      --panel: rgba(16, 24, 48, 0.75);
+      --panel-strong: rgba(18, 32, 68, 0.9);
+      --accent: #00e0ff;
+      --accent-2: #ffc247;
+      --muted: #9fb2d4;
+      --radius: 16px;
+      --shadow: 0 0 30px rgba(0, 224, 255, 0.32);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at 20% 25%, rgba(0, 224, 255, 0.08), transparent 32%),
+        radial-gradient(circle at 80% 0%, rgba(255, 194, 71, 0.12), transparent 38%),
+        var(--bg);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      color: #e7edff;
+      overflow: hidden;
+    }
+    .glow {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 70% 80%, rgba(0, 224, 255, 0.12), transparent 45%);
+      filter: blur(60px);
+      pointer-events: none;
+    }
+    .frame {
+      position: relative;
+      width: min(1100px, 94vw);
+      padding: 24px;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 224, 255, 0.24);
+      background: linear-gradient(135deg, rgba(17, 30, 64, 0.85), rgba(10, 16, 34, 0.9));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 18px;
+      align-items: center;
+    }
+    @media (max-width: 860px) { .frame { grid-template-columns: 1fr; } }
+    .text {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+    h1 { margin: 0; font-size: 28px; letter-spacing: 0.5px; }
+    .tagline { margin: 0; color: var(--muted); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 224, 255, 0.3);
+      color: var(--muted);
+      background: rgba(12, 24, 48, 0.7);
+      font-size: 12px;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 6px;
+      max-width: 260px;
+      width: 260px;
+      align-items: center;
+    }
+    button {
+      width: 260px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 224, 255, 0.4);
+      background: linear-gradient(120deg, #0f274a, #122f5c);
+      color: #e7edff;
+      font-size: 15px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0, 224, 255, 0.16);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    button:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0, 224, 255, 0.28); }
+    button:active { transform: translateY(0); }
+    .primary { background: linear-gradient(120deg, #00e0ff, #1a9fff); color: #041226; border-color: rgba(0, 224, 255, 0.6); }
+    .accent { border-color: rgba(255, 194, 71, 0.55); color: #ffd88a; }
+    .hero {
+      background: var(--panel-strong);
+      border: 1px solid rgba(0, 224, 255, 0.25);
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 0 20px rgba(0, 224, 255, 0.15);
+    }
+    .hero img { width: 100%; display: block; object-fit: cover; }
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.32));
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="frame">
+    <div class="text">
+      <h1>智能人参分拣终端</h1>
+      <p class="tagline">实时摄像头 · YOLO 模型切换 · 统计导出</p>
+      <div class="chips">
+        <span class="chip">8 类检测</span>
+        <span class="chip">手动截帧识别</span>
+        <span class="chip">带框预览</span>
+      </div>
+      <div class="actions">
+        <button class="primary" onclick="location.href='/app'">启动设备</button>
+        <button class="accent" onclick="alert('帮助文档稍后添加');">查看帮助</button>
+        <button onclick="alert('关于信息稍后添加');">关于项目</button>
+      </div>
+    </div>
+    <div class="hero">
+      <img src="/images/index.jpg" alt="启动封面">
+    </div>
+  </div>
+</body>
+</html>

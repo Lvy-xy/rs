@@ -1,0 +1,398 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能人参分拣终端 | YOLO 识别</title>
+  <style>
+    :root {
+      --bg: #0b1024;
+      --panel: rgba(20, 29, 58, 0.82);
+      --glow: #00e0ff;
+      --accent: #ffc247;
+      --accent-2: #f45b8c;
+      --accent-3: #33d6a6;
+      --muted: #9fb2d4;
+      --danger: #ff5c5c;
+      --success: #5be0a6;
+      --radius: 14px;
+      --shadow: 0 0 24px rgba(0, 224, 255, 0.25);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at 20% 20%, #0d1a3d, #050912 45%), radial-gradient(circle at 80% 0%, #152656, transparent 50%), var(--bg);
+      color: #e7edff;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--panel);
+      border: 1px solid rgba(0, 224, 255, 0.3);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    header h1 { margin: 0; letter-spacing: 1px; font-size: 22px; }
+    .pill { padding: 6px 10px; border-radius: 999px; font-size: 12px; border: 1px solid rgba(0, 224, 255, 0.2); color: var(--muted); background: rgba(13, 25, 53, 0.7); }
+    .pill.em { color: var(--accent); border-color: rgba(255, 194, 71, 0.4); }
+    .grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; }
+    .panel { background: var(--panel); border: 1px solid rgba(0, 224, 255, 0.25); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; }
+    .subhead { margin: 0 0 8px 0; font-size: 14px; color: var(--muted); letter-spacing: 0.5px; }
+    #feed { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid rgba(0, 224, 255, 0.25); background: #0a142f; min-height: 320px; }
+    video { width: 100%; display: block; filter: saturate(1.05); }
+    #predWrap { background: #0a142f; border: 1px solid rgba(0, 224, 255, 0.25); border-radius: 10px; min-height: 320px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    #predictImg { width: 100%; height: auto; display: block; object-fit: contain; }
+    #predHint { position: absolute; color: var(--muted); }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; align-items: center; }
+    button, select {
+      background: linear-gradient(120deg, #143a63, #0f2446);
+      color: #e7edff;
+      border: 1px solid rgba(0, 224, 255, 0.35);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      box-shadow: 0 0 10px rgba(0, 224, 255, 0.15);
+    }
+    button:hover, select:hover { transform: translateY(-1px); box-shadow: 0 0 14px rgba(0, 224, 255, 0.35); }
+    button:active { transform: translateY(0); }
+    select { padding-right: 34px; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+    .count-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .card { background: linear-gradient(160deg, rgba(16, 28, 54, 0.9), rgba(24, 46, 84, 0.6)); border-radius: 12px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.06); position: relative; overflow: hidden; }
+    .card strong { font-size: 13px; color: #d5e0ff; }
+    .card .value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+    .card .bar { margin-top: 8px; height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; }
+    .bar span { display: block; height: 100%; border-radius: 999px; width: 5%; background: linear-gradient(90deg, #60f0c6, #00b3ff); }
+    .status-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .footer-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
+    .footer-actions button { width: 100%; }
+    .muted { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .alert { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>智能人参分拣终端 | YOLO 识别</h1>
+    <div class="pill em">摄像头实时打开 · 点击按钮截帧识别并累积</div>
+  </header>
+
+  <div class="grid">
+    <section class="panel">
+      <p class="subhead">实时画面</p>
+      <div id="feed">
+        <video id="video" autoplay muted playsinline></video>
+      </div>
+      <div class="controls">
+        <label class="pill">当前模型</label>
+        <select id="modelSelect">
+          {% if models %}
+            {% for m in models %}
+              <option value="{{ m }}" {% if m == default_model %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          {% else %}
+            <option disabled selected>未找到模型文件</option>
+          {% endif %}
+        </select>
+        <button id="captureBtn">截取当前帧并识别</button>
+        <button id="resetBtn">重置计数</button>
+      </div>
+      <p class="muted">提示：模型文件位于 model/ 目录。切换下拉框后会将截帧发送到对应模型进行推理。</p>
+      <p class="muted" id="statusLine">状态：等待摄像头...</p>
+      <p class="muted" id="currentClass">当前识别人参种类：-</p>
+    </section>
+
+    <section class="panel">
+      <p class="subhead">预测结果</p>
+      <div id="predWrap">
+        <img id="predictImg" alt="预测结果" style="display:none;" />
+        <p class="muted" id="predHint">截帧后在此展示带框结果</p>
+      </div>
+      <p class="subhead" style="margin-top:14px;">分类统计（8 类）</p>
+      <div class="count-grid" id="countGrid"></div>
+      <div class="status-row">
+        <span class="pill">总计 <span id="totalCount">0</span> 个</span>
+        <span class="pill">当前模型：<span id="modelName">{{ default_model }}</span></span>
+        <span class="pill">摄像头：<span id="camStatus">初始化中...</span></span>
+        <span class="pill">PLC：<span id="plcStatus">未启动</span></span>
+      </div>
+      <div class="footer-actions">
+        <button id="exportBtn">导出统计(JSON)</button>
+        <button id="pauseBtn">暂停/恢复预览</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const classes = {{ classes|tojson }};
+    const totalCountEl = document.getElementById('totalCount');
+    const countGrid = document.getElementById('countGrid');
+    const modelSelect = document.getElementById('modelSelect');
+    const modelNameEl = document.getElementById('modelName');
+    const camStatusEl = document.getElementById('camStatus');
+    const plcStatusEl = document.getElementById('plcStatus');
+    const statusLine = document.getElementById('statusLine');
+    const currentClassEl = document.getElementById('currentClass');
+    const video = document.getElementById('video');
+    const predictImg = document.getElementById('predictImg');
+    const predHint = document.getElementById('predHint');
+
+    const state = {
+      counts: Object.fromEntries(classes.map(c => [c.id, 0])),
+      total: 0,
+      paused: false,
+      busy: false,
+    };
+    let plcTimer = null;
+    let lastTrigger = 0;
+    let plcConnecting = false;
+    let plcRequesting = false;
+    const MAX_CAPTURE_WIDTH = 1920;  // 提高截帧分辨率上限，兼顾清晰度
+    const JPEG_QUALITY = 0.9;        // 提高 JPEG 质量，减少压缩模糊
+    const PLC_CAPTURE_DELAY_MS = 10; // PLC 触发后延迟截帧，避免画面未稳定
+
+    function initCounts() {
+      countGrid.innerHTML = '';
+      classes.forEach(cls => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <strong>${cls.id}. ${cls.name}</strong>
+          <div class="value" id="count-${cls.id}">0</div>
+          <div class="bar"><span id="bar-${cls.id}" style="background: linear-gradient(90deg, ${cls.color}, #00b3ff); width: 5%;"></span></div>
+        `;
+        countGrid.appendChild(card);
+      });
+      updateCountsUI();
+    }
+
+    function updateCountsUI() {
+      const maxCount = Math.max(...Object.values(state.counts), 1);
+      classes.forEach(cls => {
+        const val = state.counts[cls.id] || 0;
+        document.getElementById(`count-${cls.id}`).textContent = val;
+        const percent = Math.min(100, (val / maxCount) * 100);
+        document.getElementById(`bar-${cls.id}`).style.width = `${percent || 5}%`;
+      });
+      state.total = Object.values(state.counts).reduce((a, b) => a + b, 0);
+      totalCountEl.textContent = state.total;
+    }
+
+    async function startPLC() {
+      if (plcConnecting) return;
+      plcConnecting = true;
+      try {
+        await fetch('/plc/start', { method: 'POST' });
+      } catch (e) {
+        console.warn('PLC 启动失败', e);
+      } finally {
+        plcConnecting = false;
+      }
+      await refreshPLC();
+      if (plcTimer) clearInterval(plcTimer);
+      // 更快轮询以避免漏掉 DBW0=1 的触发（缩短轮询间隔以降低触发延迟）
+      plcTimer = setInterval(refreshPLC, 60);
+    }
+
+    async function refreshPLC() {
+      if (plcRequesting) return;
+      plcRequesting = true;
+      try {
+        const resp = await fetch('/plc/status');
+        const data = await resp.json();
+        if (data.connected) {
+          const trigger = Number(data.trigger ?? 0);
+          plcStatusEl.textContent = trigger === 1 ? `已连接 (${data.ip}) · 触发=1` : `已连接 (${data.ip})`;
+          plcStatusEl.style.color = '#5be0a6';
+          if (trigger === 1 && lastTrigger !== 1 && !state.busy) {
+            lastTrigger = 1;
+            captureAndDetect(true);
+          } else if (trigger !== 1) {
+            lastTrigger = trigger || 0;
+          }
+        } else {
+          plcStatusEl.textContent = '未连接，正在重连...';
+          plcStatusEl.style.color = '';
+          lastTrigger = 0;
+          if (!plcConnecting) startPLC();
+        }
+      } catch (e) {
+        plcStatusEl.textContent = '状态未知';
+        plcStatusEl.style.color = '';
+      } finally {
+        plcRequesting = false;
+      }
+    }
+
+    async function openCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1920, min: 1280 },
+            height: { ideal: 1080, min: 720 },
+            facingMode: 'environment',
+          },
+          audio: false
+        });
+        video.srcObject = stream;
+        camStatusEl.textContent = '运行中';
+        statusLine.textContent = '状态：摄像头已开启，点击截帧识别';
+      } catch (err) {
+        camStatusEl.innerHTML = '<span class="alert">无法访问摄像头</span>';
+        statusLine.innerHTML = '<span class="alert">请检查摄像头权限</span>';
+        document.getElementById('captureBtn').disabled = true;
+      }
+    }
+
+    function drawDetectionsOnImage(imageDataUrl, detections) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          detections.forEach(det => {
+            const cls = classes.find(c => c.id === det.cls_id) || { color: '#00e0ff', name: det.cls_name };
+            const [x1, y1, x2, y2] = det.box;
+            ctx.strokeStyle = cls.color;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+            ctx.fillStyle = `${cls.color}cc`;
+            const label = `${cls.name} ${(det.conf * 100).toFixed(0)}%`;
+            ctx.font = '16px "Segoe UI"';
+            const textW = ctx.measureText(label).width + 16;
+            ctx.fillRect(x1, Math.max(0, y1 - 26), textW, 24);
+            ctx.fillStyle = '#0b1024';
+            ctx.fillText(label, x1 + 8, Math.max(14, y1 - 8));
+          });
+          resolve(canvas.toDataURL('image/jpeg', 0.9));
+        };
+        img.onerror = reject;
+        img.src = imageDataUrl;
+      });
+    }
+
+    async function captureAndDetect(triggeredByPLC = false) {
+      if (state.busy) return;
+      const btn = document.getElementById('captureBtn');
+      const model = modelSelect.value;
+      if (!model || btn.disabled) return;
+      if (!video.videoWidth) {
+        statusLine.innerHTML = '<span class="alert">摄像头未就绪</span>';
+        return;
+      }
+      state.busy = true;
+      btn.textContent = '识别中...';
+      statusLine.textContent = triggeredByPLC ? '状态：PLC 触发，自动截帧识别...' : '状态：上传截帧进行识别...';
+      try {
+        if (triggeredByPLC && PLC_CAPTURE_DELAY_MS > 0) {
+          await new Promise(resolve => setTimeout(resolve, PLC_CAPTURE_DELAY_MS));
+        }
+        const cap = document.createElement('canvas');
+        const scale = Math.min(1, MAX_CAPTURE_WIDTH / video.videoWidth);
+        cap.width = Math.round(video.videoWidth * scale);
+        cap.height = Math.round(video.videoHeight * scale);
+        const ctx = cap.getContext('2d');
+        ctx.imageSmoothingEnabled = false; // 避免下采样模糊
+        ctx.drawImage(video, 0, 0, cap.width, cap.height);
+        const blob = await new Promise(resolve => cap.toBlob(resolve, 'image/jpeg', JPEG_QUALITY));
+        if (!blob) throw new Error('截帧失败');
+        const frameUrl = URL.createObjectURL(blob);
+
+        const form = new FormData();
+        form.append('file', blob, 'frame.jpg');
+        form.append('model', model);
+        form.append('plc_trigger', triggeredByPLC ? '1' : '0');
+
+        const resp = await fetch('/detect', { method: 'POST', body: form });
+        const json = await resp.json();
+        if (!resp.ok) {
+          if (resp.status === 409 && triggeredByPLC) {
+            statusLine.textContent = '状态：PLC 未触发/已复位，等待下次触发...';
+            return;
+          }
+          throw new Error(json.error || '识别失败');
+        }
+
+        Object.entries(json.counts || {}).forEach(([clsId, inc]) => {
+          const key = Number(clsId);
+          state.counts[key] = (state.counts[key] || 0) + Number(inc);
+        });
+        updateCountsUI();
+
+        const bestClsId = Number(json.best_cls || 0);
+        const bestClass = classes.find(c => c.id === bestClsId);
+        currentClassEl.textContent = bestClass
+          ? `当前识别人参种类：${bestClsId}. ${bestClass.name}`
+          : `当前识别人参种类：${bestClsId || '-'}`
+
+        const annotated = await drawDetectionsOnImage(frameUrl, json.detections || []);
+        predictImg.src = annotated;
+        predictImg.style.display = 'block';
+        predHint.style.display = 'none';
+        statusLine.textContent = `状态：识别完成（模型 ${json.model || model}）`;
+        if (json.plc) {
+          plcStatusEl.textContent = json.plc.connected ? `已连接 (${json.plc.ip})` : '未连接';
+          plcStatusEl.style.color = json.plc.connected ? '#5be0a6' : '';
+        }
+        URL.revokeObjectURL(frameUrl);
+      } catch (err) {
+        statusLine.innerHTML = `<span class="alert">${err.message || err}</span>`;
+      } finally {
+        state.busy = false;
+        btn.textContent = '截取当前帧并识别';
+        if (triggeredByPLC) lastTrigger = 0;
+      }
+    }
+
+    document.getElementById('captureBtn').addEventListener('click', captureAndDetect);
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      classes.forEach(c => state.counts[c.id] = 0);
+      updateCountsUI();
+      predictImg.style.display = 'none';
+      predictImg.removeAttribute('src');
+      statusLine.textContent = '状态：计数已清零';
+      currentClassEl.textContent = '当前识别人参种类：-';
+    });
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const data = { model: modelSelect.value, total: state.total, counts: state.counts, timestamp: new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ginseng_stats.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+    document.getElementById('pauseBtn').addEventListener('click', () => {
+      state.paused = !state.paused;
+      if (state.paused) {
+        video.pause();
+        camStatusEl.textContent = '已暂停预览';
+      } else {
+        video.play();
+        camStatusEl.textContent = '运行中';
+      }
+    });
+    modelSelect.addEventListener('change', () => {
+      modelNameEl.textContent = modelSelect.value;
+    });
+
+    initCounts();
+    openCamera();
+    startPLC();
+  </script>
+</body>
+</html>
