@@ -95,8 +95,11 @@ class PLCManager:
         self.connected = False
         return False
 
-    def write_result(self, cls_id: int, max_retries: int = 3) -> bool:
-        """Single PLC round trip: DBW0=2 (done), DBW2=cls_id（毫秒级写回，无额外确认读）。"""
+    def write_result(self, cls_id: int, max_retries: int = 3, confirm: bool = False) -> bool:
+        """Single PLC round trip: DBW0=2 (done), DBW2=cls_id.
+
+        Keep the write path单次往返，避免额外确认读阻塞（默认关闭确认以减小延迟）。
+        """
         status_val = max(-32768, min(32767, 2))
         cls_val = max(-32768, min(32767, int(cls_id)))
         payload = status_val.to_bytes(2, byteorder="big", signed=True) + cls_val.to_bytes(
@@ -111,11 +114,33 @@ class PLCManager:
                     self.client.db_write(self.db, 0, payload)
                     self.exec_count += 1
                     self.last_result = cls_val
+                    # 可选的单次轻量确认，不重试，避免增加等待
+                    if confirm:
+                        self._confirm_result(status_val, cls_val, retries=0)
                     return True
                 except Exception as exc:
                     self.last_error = f"write_result failed: {exc}"
             time.sleep(RETRY_DELAY_SEC)
         self.connected = False
+        return False
+
+    def _confirm_result(self, status_val: int, cls_val: int, retries: int = 0) -> bool:
+        if not (self.client and self.connected):
+            return False
+        for _ in range(max(0, retries) + 1):
+            try:
+                data = self.client.db_read(self.db, 0, 4)
+            except Exception as exc:
+                self.last_error = f"confirm DB{self.db} write failed: {exc}"
+                self.connected = False
+                return False
+
+            status = int.from_bytes(data[:2], byteorder="big", signed=True)
+            result = int.from_bytes(data[2:], byteorder="big", signed=True)
+            if status == status_val and result == cls_val:
+                self.last_trigger = status
+                self.last_trigger_ts = time.time()
+                return True
         return False
 
     def trigger_recent(self, window_sec: float = FAST_TRIGGER_WINDOW_SEC) -> bool:
