@@ -7,7 +7,7 @@ MODEL_DIR = APP_ROOT / "model"
 TEMPLATE_DIR = APP_ROOT / "templates"
 STATIC_DIR = APP_ROOT / "images"
 
-DEFAULT_MODEL = os.getenv("YOLO_MODEL", "best.pt")
+DEFAULT_MODEL = os.getenv("YOLO_MODEL", "yolo_rs.pt")
 CONF_THRESHOLD = float(os.getenv("YOLO_CONF", "0.1"))
 
 # PLC settings (DB4: DBW0 trigger, DBW2 result)

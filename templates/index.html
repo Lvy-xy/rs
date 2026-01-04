@@ -96,18 +96,20 @@
       <div class="controls">
         <label class="pill">当前模型</label>
         <select id="modelSelect">
-          {% if models %}
-            {% for m in models %}
-              <option value="{{ m }}" {% if m == default_model %}selected{% endif %}>{{ m }}</option>
-            {% endfor %}
-          {% else %}
-            <option disabled selected>未找到模型文件</option>
-          {% endif %}
+          {% for m in models %}
+            <option value="{{ m }}" {% if m == default_model %}selected{% endif %}>
+              {{ m }}{% if using_placeholder %}（模拟推理）{% endif %}
+            </option>
+          {% endfor %}
         </select>
         <button id="captureBtn">截取当前帧并识别</button>
         <button id="resetBtn">重置计数</button>
       </div>
+      {% if using_placeholder %}
+      <p class="muted alert">未在 model/ 目录发现权重，将使用模拟推理返回随机检测结果。放入 .pt 权重后重启服务即可自动加载。</p>
+      {% else %}
       <p class="muted">提示：模型文件位于 model/ 目录。切换下拉框后会将截帧发送到对应模型进行推理。</p>
+      {% endif %}
       <p class="muted" id="statusLine">状态：等待摄像头...</p>
       <p class="muted" id="currentClass">当前识别人参种类：-</p>
     </section>

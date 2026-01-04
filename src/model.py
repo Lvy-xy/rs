@@ -45,6 +45,7 @@ class ModelManager:
 
     def __init__(self, model_dir):
         self.model_dir = model_dir
+        self.model_dir.mkdir(parents=True, exist_ok=True)
         self.cache: Dict[str, Optional["YOLO"]] = {}
 
     def available(self) -> List[str]:
@@ -54,12 +55,13 @@ class ModelManager:
         if name in self.cache:
             return self.cache[name]
         model_path = self.model_dir / name
-        if not model_path.exists():
-            raise FileNotFoundError(f"Model not found: {model_path}")
-        if YOLO is None:
+        if YOLO is None or not model_path.exists():
             self.cache[name] = None
             return None
-        self.cache[name] = YOLO(model_path)
+        try:
+            self.cache[name] = YOLO(model_path)
+        except Exception:
+            self.cache[name] = None
         return self.cache[name]
 
     def predict(self, image: Image.Image, model_name: str) -> List[Detection]:

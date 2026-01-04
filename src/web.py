@@ -20,28 +20,40 @@ app = Flask(
 model_manager = ModelManager(config.MODEL_DIR)
 plc_manager = PLCManager()
 _LAST_PLC_LOG = {"connected": None, "trigger": None, "ts": 0.0}
+_FALLBACK_MODEL_NAME = config.DEFAULT_MODEL or "yolo_rs.pt"
+
+
+def _resolve_models() -> Dict[str, object]:
+    available = model_manager.available()
+    if available:
+        default_model = config.DEFAULT_MODEL if config.DEFAULT_MODEL in available else available[0]
+        using_placeholder = False
+        models = available
+    else:
+        default_model = _FALLBACK_MODEL_NAME
+        using_placeholder = True
+        models = [default_model]
+    return {"models": models, "default_model": default_model, "using_placeholder": using_placeholder}
 
 
 @app.route("/", methods=["GET"])
 def home():
-    models = model_manager.available()
-    default_model = config.DEFAULT_MODEL if config.DEFAULT_MODEL in models else (models[0] if models else "")
+    model_ctx = _resolve_models()
     return render_template(
         "home.html",
-        models=models,
-        default_model=default_model,
+        **model_ctx,
     )
 
 
 @app.route("/app", methods=["GET"])
 def index():
-    models = model_manager.available()
-    default_model = config.DEFAULT_MODEL if config.DEFAULT_MODEL in models else (models[0] if models else "")
+    model_ctx = _resolve_models()
     return render_template(
         "index.html",
-        models=models,
+        models=model_ctx["models"],
         classes=CLASS_META,
-        default_model=default_model,
+        default_model=model_ctx["default_model"],
+        using_placeholder=model_ctx["using_placeholder"],
     )
 
 
@@ -104,8 +116,12 @@ def detect():
         except Exception as exc:
             return jsonify({"error": f"图像解析失败: {exc}"}), 400
 
-    if model_name not in model_manager.available():
-        return jsonify({"error": f"模型未找到 {model_name}"}), 400
+    available_models = model_manager.available()
+    if available_models:
+        if model_name not in available_models:
+            return jsonify({"error": f"模型未找到 {model_name}"}), 400
+    else:
+        model_name = _FALLBACK_MODEL_NAME
 
     # 未启/掉线时尝试自动重连一次，避免只能手动触发
     if not plc_manager.connected:
